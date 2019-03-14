@@ -11,7 +11,7 @@ car = Car;
 % Set full_DDP=true to compute 2nd order derivatives of the 
 % dynamics. This will make iterations more expensive, but 
 % final convergence will be much faster (quadratic)
-full_DDP = true;
+full_DDP = false;
 
 % set up the optimization problem
 DYNCST  = @(x,u,i) car.carObjective.dyn_cst(x,u,full_DDP);
@@ -43,7 +43,7 @@ plotFn = @(x) set(line_handle,'Xdata',x(1,:),'Ydata',x(2,:));
 Op.plotFn = plotFn;
 
 % === run the optimization!
-[x,u]= iLQG(DYNCST, x0, u0, Op);
+[x,u]= ControlOptimizer(DYNCST, x0, u0, Op);
 
 % animate the resulting trajectory
 figure(9)
