@@ -15,12 +15,9 @@ full_DDP = false;
 
 % set up the optimization problem
 DYNCST  = @(x,u,i) car.carObjective.dyn_cst(x,u,full_DDP);
-T       = 500;              % horizon
-x0      = [2;2;0;0];   % initial state
-u0      = .1*zeros(2,T);    % initial controls
-Op.lims  = [-.5 .5;         % wheel angle limits (radians)
-             -2  2];        % acceleration limits (m/s^2)
-Op.plot = -1;               % plot the derivatives as well
+T       = 20;              % horizon
+x0      = [2;2;pi/2;0];   % initial state
+u0      = rand(2,T);    % initial controls
 
 % prepare the visualization window and graphics callback
 figure(9);
@@ -43,8 +40,8 @@ plotFn = @(x) set(line_handle,'Xdata',x(1,:),'Ydata',x(2,:));
 Op.plotFn = plotFn;
 
 % === run the optimization!
-[x,u]= ControlOptimizer(DYNCST, x0, u0, Op);
-
+% [x,u]= Newton(DYNCST, x0, u0, Op);
+[x,u]= DDP(DYNCST, x0, u0, Op);
 % animate the resulting trajectory
 figure(9)
 handles = [];

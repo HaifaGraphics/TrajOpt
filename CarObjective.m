@@ -57,6 +57,11 @@ classdef CarObjective
             
 %             control cost
             lu    = cu*u.^2;
+            angle_lim = 0.1;
+            a = (u(1,:)-angle_lim).^2;
+            a(abs(u(1,:))<angle_lim) = 0;
+            
+            
             
 %             final cost
             if any(final)
@@ -71,7 +76,7 @@ classdef CarObjective
             lx = cx*x(1:2,:).^2;
             
 %             total cost
-            c     = lu + lx + lf;
+            c     = lu + a + lx + 100*lf;
         end
         
         function [f,c,fx,fu,fxx,fxu,fuu,cx,cu,cxx,cxu,cuu] = dyn_cst(obj,x,u,fullHessian)

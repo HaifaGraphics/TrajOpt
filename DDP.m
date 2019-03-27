@@ -1,4 +1,4 @@
-function [x, u, L, Vx, Vxx, cost, trace, stop] = ControlOptimizer(DYNCST, x0, u0, Op)
+function [x, u, L, Vx, Vxx, cost] = DDP(DYNCST, x0, u0, Op)
 % iLQG - solve the deterministic finite-horizon optimal control problem.
 %
 %        minimize sum_i CST(x(:,i),u(:,i)) + CST(x(:,end))
@@ -87,9 +87,9 @@ N   = size(u0, 2);          % number of state transitions
 u   = u0;                   % initial control sequence
 
 % --- initial trajectory
-[x,u,cost]  = forward_pass(x0(:,1),u,[],[],[],1,DYNCST,Op.lims);
+[x,u,cost]  = forward_pass(x0(:,1),u,[],[],[],1,DYNCST);
 
-for iter = 1:100
+for iter = 1:500
     display([int2str(iter) ': ' num2str(sum(cost(:)))]);
     %====== STEP 1: differentiate dynamics and cost along new trajectory
     [~,~,fx,fu,fxx,fxu,fuu,cx,cu,cxx,cxu,cuu] = DYNCST(x, [u nan(m,1)], 1:N+1);
@@ -97,17 +97,17 @@ for iter = 1:100
     %====== STEP 2: backward pass, compute optimal control law and cost-to-go
     lambda = 0.01; % regularization
     regType = 1;
-    [~, Vx, Vxx, l, L, dV] = back_pass(cx,cu,cxx,cxu,cuu,fx,fu,fxx,fxu,fuu,lambda,regType,Op.lims,u);
+    [~, Vx, Vxx, l, L, dV] = back_pass(cx,cu,cxx,cxu,cuu,fx,fu,fxx,fxu,fuu,lambda,regType,u);
     
     %====== STEP 3: line-search to find new control sequence, trajectory, cost
     alpha = 1;
     costnew = zeros(size(cost));
     flag = true;
     while flag
-        [xnew,unew,costnew] = forward_pass(x0 ,u+l*alpha, L, x(:,1:N),[],1,DYNCST,Op.lims);
+        [xnew,unew,costnew] = forward_pass(x0 ,u+l*alpha, L, x(:,1:N),[],1,DYNCST);
         if sum(cost(:)) < sum(costnew(:))
             alpha = alpha / 2;
-            display('line search fail');
+%             display('line search fail');
         else
             flag = false;
         end
@@ -121,7 +121,7 @@ for iter = 1:100
     cost           = costnew;
     Op.plotFn(x);
     drawnow;
-    if(deltacost<1e-5)
+    if(deltacost<1e-5 & sum(dV.^2)<1e-5)
         break;
     end
 end
@@ -152,10 +152,6 @@ for i = 1:N
     if ~isempty(L)
         dx          = xnew(:,:,i) - x(:,i*K1);
         unew(:,:,i) = unew(:,:,i) + L(:,:,i)*dx;
-    end
-    
-    if ~isempty(lims)
-        unew(:,:,i) = min(lims(:,2*K1), max(lims(:,1*K1), unew(:,:,i)));
     end
 
     [xnew(:,:,i+1), cnew(:,:,i)]  = DYNCST(xnew(:,:,i), unew(:,:,i), i*K1);
@@ -226,36 +222,18 @@ for i = N-1:-1:1
         QuuF = QuuF + fuuVx;
     end
     
-    if nargin < 13 || isempty(lims) || lims(1,1) > lims(1,2)
-        % no control limits: Cholesky decomposition, check for non-PD
-        [R,d] = chol(QuuF);
-        if d ~= 0
-            diverge  = i;
-            return;
-        end
-        
-        % find control law
-        kK = -R\(R'\[Qu Qux_reg]);
-        k_i = kK(:,1);
-        K_i = kK(:,2:n+1);
-        
-    else        % solve Quadratic Program
-        lower = lims(:,1)-u(:,i);
-        upper = lims(:,2)-u(:,i);
-        
-        [k_i,result,R,free] = boxQP(QuuF,Qu,lower,upper,k(:,min(i+1,N-1)));
-        if result < 1
-            diverge  = i;
-            return;
-        end
-        
-        K_i    = zeros(m,n);
-        if any(free)
-            Lfree        = -R\(R'\Qux_reg(free,:));
-            K_i(free,:)   = Lfree;
-        end
-        
+    % no control limits: Cholesky decomposition, check for non-PD
+    [R,d] = chol(QuuF);
+    if d ~= 0
+        diverge  = i;
+        return;
     end
+
+    % find control law
+    kK = -R\(R'\[Qu Qux_reg]);
+    k_i = kK(:,1);
+    K_i = kK(:,2:n+1);
+        
     
     % update cost-to-go approximation
     dV          = dV + [k_i'*Qu  .5*k_i'*Quu*k_i];
