@@ -51,7 +51,7 @@ classdef CarObjective
             final = isnan(u(1,:));
             u(:,final)  = 0;
             
-            cu  = 1e-2*[1 .1];         % control cost coefficients
+            cu  = 1e-2*[1 .25];         % control cost coefficients
             
             cf  = [ .1  .1   1  .3];    % final cost coefficients
             pf  = [.01 .01 .01  1]';    % smoothness scales for final cost
@@ -60,12 +60,14 @@ classdef CarObjective
             
 %             control cost
             lu    = cu*u.^2;
-            angle_lim = 0.3;
+            angle_lim = 0.4;
+            %a = (10*(abs(u(1,:))-angle_lim)).^2;
             a = (abs(u(1,:))-angle_lim).^2;
             a(abs(u(1,:))<angle_lim) = 0;
             
-            acc_lim = 1;
-            b = 0.1*(abs(u(2,:))-acc_lim).^2;
+            acc_lim = 1.8;
+            %b = (10*(abs(u(2,:))-acc_lim)).^2;
+            b = (abs(u(2,:))-acc_lim).^2;
             b(abs(u(2,:))<acc_lim) = 0;
             
 %             final cost
@@ -79,7 +81,7 @@ classdef CarObjective
 %             running cost
             lx = cx*x(1:2,:).^2;
             
-            c     = lu + 10*a + 10*b + lx + 100*lf;
+            c     = lu + 10^3*a + 10^3*b + lx + 100*lf;
         end
         
         function [f,c,fx,fu,fxx,fxu,fuu,cx,cu,cxx,cxu,cuu] = dyn_cst(obj,x,u,fullHessian)

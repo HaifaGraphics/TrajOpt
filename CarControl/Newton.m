@@ -56,7 +56,18 @@ function [x, u, cost,costi] = Newton(DYNCST, x0, u0, Op)
         end
         s=eig(H'+H);
         if(any(s<0))
-            disp('H not PSD');
+            disp('H not PSD, trying to modify H');
+            flag = true;
+            mu = 1e-4;
+            itr = 0;
+            while flag
+                H = H + mu*eye(size(H));
+                s=eig(H'+H);
+                flag = any(s<0);    
+                itr = itr + 1;
+                mu = mu * 2;
+            end
+            disp(['Modifying H took ' int2str(itr) ' iterations']);
         end
         
         alpha = 1;
@@ -97,7 +108,6 @@ function [x, u, cost,costi] = Newton(DYNCST, x0, u0, Op)
             otherwise
                 error('limits are of the wrong size')
         end
-            
 
         if ~all(u > Op.lims(:, 1*ones(1,N)) & u < Op.lims(:, 2*ones(1,N)), 'all')
             display(u);
@@ -105,8 +115,8 @@ function [x, u, cost,costi] = Newton(DYNCST, x0, u0, Op)
         else
             %Disp max control utilization% metric to ensure we aren't restricting
             %ourselves from using all of the available control bandwidth
-            display('Control Utilization%')
-            (max(u,[],2) - min(u,[],2)) ./ (Op.lims(:,2) - Op.lims(:,1)) .* 100
+            display('Control Utilization%');
+            display((max(u,[],2) - min(u,[],2)) ./ (Op.lims(:,2) - Op.lims(:,1)) .* 100);
         end
     end
 end

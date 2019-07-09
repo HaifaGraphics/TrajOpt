@@ -151,7 +151,7 @@ if ~isempty(Op.lims)
         %Disp max control utilization% metric to ensure we aren't restricting
         %ourselves from using all of the available control bandwidth
         display('Control Utilization%')
-        (max(u,[],2) - min(u,[],2)) ./ (Op.lims(:,2) - Op.lims(:,1)) .* 100
+        display((max(u,[],2) - min(u,[],2)) ./ (Op.lims(:,2) - Op.lims(:,1)) .* 100);
     end
 end
 
