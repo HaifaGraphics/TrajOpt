@@ -130,31 +130,6 @@ for iter = 1:100
     end
 end
 
-% check control sequence legality
-if ~isempty(Op.lims)
-    switch numel(Op.lims)
-        case 0
-        case 2*m
-            Op.lims = sort(Op.lims,2);
-        case 2
-            Op.lims = ones(m,1)*sort(Op.lims(:))';
-        case m
-            Op.lims = Op.lims(:)*[-1 1];
-        otherwise
-            error('limits are of the wrong size')
-    end
-
-    if ~all(u > Op.lims(:, 1*ones(1,N)) & u < Op.lims(:, 2*ones(1,N)), 'all')
-        display(u);
-        error('Illegal control sequence')
-    else
-        %Disp max control utilization% metric to ensure we aren't restricting
-        %ourselves from using all of the available control bandwidth
-        display('Control Utilization%')
-        display((max(u,[],2) - min(u,[],2)) ./ (Op.lims(:,2) - Op.lims(:,1)) .* 100);
-    end
-end
-
 
 function [xnew,unew,cnew] = forward_pass(x0,u,L,x,du,Alpha,DYNCST,lims)
 % parallel forward-pass (rollout)

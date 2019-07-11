@@ -13,33 +13,40 @@ classdef CarObjective
         function y = dynamics(~,x,u)
             
 %             === states and controls:
-%             x = [x y t v]' = [x; y; car_angle; front_wheel_velocity]
-%             u = [w a]'     = [front_wheel_angle; acceleration]
+%             x = [x1 y1 t1 v1 x2 y2 t2 v2 ...]' = [x; y; car_angle; front_wheel_velocity...]
+%             u = [w1 a1 w2 a2 ...]'     = [front_wheel_angle; acceleration...]
             
 %             constants
             d  = 2.0;      % d = distance between back and front axles
             h  = 0.03;     % h = timestep (seconds)
+            num_obj = size(x,1) / 4;
             
-%             controls
-            w  = u(1,:,:); % w = front wheel angle
-            a  = u(2,:,:); % a = front wheel acceleration
-            
-            o  = x(3,:,:); % o = car angle
-%             z = unit_vector(o)
-            z  = [cos(o); sin(o)];
-            
-            v  = x(4,:,:); % v = front wheel velocity
-            f  = h*v;      % f = front wheel rolling distance
-%             b = back wheel rolling distance
-            b  = d + f.*cos(w) - sqrt(d^2 - (f.*sin(w)).^2);
-            if ~isreal(b)
-                error('FOUND IMG b')
+            y = x;
+            %TODO: cleanup, remove loop
+            for idx = 1:num_obj
+                x_offset = (idx - 1)*4;
+                u_offset = (idx - 1)*2;
+                %             controls
+                w  = u(1 + u_offset,:,:); % w = front wheel angle
+                a  = u(2 + u_offset,:,:); % a = front wheel acceleration
+
+                o  = x(3 + x_offset,:,:); % o = car angle
+    %             z = unit_vector(o)
+                z  = [cos(o); sin(o)];
+
+                v  = x(4 + x_offset,:,:); % v = front wheel velocity
+                f  = h*v;      % f = front wheel rolling distance
+    %             b = back wheel rolling distance
+                b  = d + f.*cos(w) - sqrt(d^2 - (f.*sin(w)).^2);
+                if ~isreal(b)
+                    error('FOUND IMG b')
+                end
+    %             do = change in car angle
+                do = asin(sin(w).*f/d);
+
+                dy = [[b;b].*z; do; h*a];           % change in state
+                y((1:4) + x_offset,:,:) = y((1:4) + x_offset,:,:)+ dy;    % new state
             end
-%             do = change in car angle
-            do = asin(sin(w).*f/d);
-            
-            dy = [[b;b].*z; do; h*a];   % change in state
-            y  = x + dy;                % new state
         end
         function c = cost(~,x, u)
 %             cost function for car-parking problem
@@ -47,28 +54,40 @@ classdef CarObjective
 %             lu: quadratic cost on controls
 %             lf: final cost on distance from target parking configuration
 %             lx: running cost on distance from origin to encourage tight turns
-            
+            %u = reshape(u,2,[]);
+            %x = reshape(x,4, []);
             final = isnan(u(1,:));
             u(:,final)  = 0;
             
-            cu  = 1e-2*[1 .25];         % control cost coefficients
+            num_obj = size(x,1) / 4;
+            
+            %TODO: increase to 10^4
+            cc  = repmat(1e3,1,num_obj);    % control soft-constraint coefficients
+            cu  = 1e-2*[1 .25];             % control cost coefficients
             
             cf  = [ .1  .1   1  .3];    % final cost coefficients
-            pf  = [.01 .01 .01  1]';    % smoothness scales for final cost
+            %pf  = [.01 .01 .01  1]';    % smoothness scales for final cost
             
-            cx  = 1e-3*[1  1];          % running cost coefficients
+            cx  = 1e-3*[1  1 0 0];          % running cost coefficients
             
-%             control cost
+%           pad coefficients for multiple cars
+            cu = repmat(cu,1,num_obj);
+            cf = repmat(cf,1,num_obj);
+            cx = repmat(cx,1,num_obj);
+            
+%           control cost
             lu    = cu*u.^2;
             angle_lim = 0.4;
             %a = (10*(abs(u(1,:))-angle_lim)).^2;
-            a = (abs(u(1,:))-angle_lim).^2;
-            a(abs(u(1,:))<angle_lim) = 0;
+            a = (abs(u(1:2:end,:))-angle_lim).^2;
+            a(abs(u(1:2:end,:))<angle_lim) = 0;
+            lang = cc*a;
             
             acc_lim = 1.8;
             %b = (10*(abs(u(2,:))-acc_lim)).^2;
-            b = (abs(u(2,:))-acc_lim).^2;
-            b(abs(u(2,:))<acc_lim) = 0;
+            b = (abs(u(2:2:end,:))-acc_lim).^2;
+            b(abs(u(2:2:end,:))<acc_lim) = 0;
+            lacc = cc*b;
             
 %             final cost
             if any(final)
@@ -79,9 +98,9 @@ classdef CarObjective
                 lf    = 0;
             end
 %             running cost
-            lx = cx*x(1:2,:).^2;
+            lx = cx*x.^2;
             
-            c     = lu + 10^3*a + 10^3*b + lx + 100*lf;
+            c     = lu + lang + lacc + lx + 100*lf;
         end
         
         function [f,c,fx,fu,fxx,fxu,fuu,cx,cu,cxx,cxu,cuu] = dyn_cst(obj,x,u,fullHessian)
@@ -93,8 +112,9 @@ classdef CarObjective
                 c = obj.cost(x,u);
             else
 %                 state and control indices
-                ix = 1:4;
-                iu = 5:6;
+                num_obj = size(x,1) / 4;
+                ix = 1:4*num_obj;
+                iu = (4*num_obj + 1):(6*num_obj);
                 
 %                 dynamics first derivatives
                 xu_dyn  = @(xu) obj.dynamics(xu(ix,:),xu(iu,:));
