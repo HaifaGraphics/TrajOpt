@@ -15,13 +15,16 @@ carobj = car.carObjective;
 full_DDP = false;
 
 % set up the optimization problem
-DYNCST  = @(x,u,i) carobj.dyn_cst(x,u,full_DDP);
-T       = 300;              % horizon
+xT      = [-5;-2;pi*3/2;0;5;2;-pi*3/2;0]; % target state
+DYNCST  = @(x,u,i) carobj.dyn_cst(x,u,xT,full_DDP);
+T       = 500;              % horizon
 num_obj = 2;                % number of cars
-x0      = [2;2;pi*3/2;0;-2;-2;-pi*3/2;0];%;0;-5;5;0;0];   % initial state
-u0      = rand(2*num_obj,T);    % initial controls
+x0      = [-4;0;0;0;4;0;-pi;0];%;0;-5;5;0;0];   % initial state
+u0      = repmat([-.5;-2],num_obj,T) + repmat([1;2],num_obj,T) .* rand(2*num_obj, T); % initial controls
 Op.lims  = [-.5 .5;         % wheel angle limits (radians)
              -2  2];        % acceleration limits (m/s^2)
+doNewton = false;
+doDDP    = true;
 
 % prepare the visualization window and graphics callback
 figure(9);
@@ -31,7 +34,10 @@ grid on
 box on
 
 % plot target configuration with light colors
-handles = car.draw([0 0 0 0]', [0 0]');
+handles = [];
+for i=1:num_obj
+    handles = [handles; car.draw(xT((1:4)+4*(i-1)), [0 0]', false)];
+end
 fcolor  = get(handles,'facecolor');
 ecolor  = get(handles,'edgecolor');
 fcolor  = cellfun(@(x) (x+3)/4,fcolor,'UniformOutput',false);
@@ -50,8 +56,8 @@ plotFn = @plot_trajectory;
 Op.plotFn = plotFn;
 
 % === run the optimization!
-[xN,uN,costN,costNi]= Newton(DYNCST, x0, u0, Op);
-%[xDDP,uDDP,~,~,~,costDDP,costDDPi]= DDP(DYNCST, x0, u0, Op);
+if doNewton [xN,uN,costN,costNi]= Newton(DYNCST, x0, u0, Op);, end
+if doDDP [xDDP,uDDP,~,~,~,costDDP,costDDPi]= DDP(DYNCST, x0, u0, Op);, end
 % check control sequence legality
 if ~isempty(Op.lims)
     m   = size(u0, 1) / num_obj;
@@ -68,17 +74,20 @@ if ~isempty(Op.lims)
     end
     lim_min = repmat(Op.lims(:,1),num_obj,T);
     lim_max = repmat(Op.lims(:,2),num_obj,T);
-    if ~all(uN > lim_min & uN < lim_max, 'all')
+    if doNewton && ~all(uN > lim_min & uN < lim_max, 'all')
         display(uN);
         display('Illegal control sequence - Newton')
-    elseif ~all(uDDP > lim_min & uDDP < lim_max, 'all')
+    elseif doDDP && ~all(uDDP > lim_min & uDDP < lim_max, 'all')
         display(uDDP);
         display('Illegal control sequence - DDP')
-    else
+    elseif doNewton
         %Disp max control utilization% metric to ensure we aren't restricting
         %ourselves from using all of the available control bandwidth
-        display('Max Control Utilization% - Newton, Car 1');
+        display('Max Control Utilization% - Newton');
         display((max(uN,[],2) - min(uN,[],2)) ./ repmat((Op.lims(:,2) - Op.lims(:,1)),num_obj,1) .* 100);
+    elseif doDDP
+        display('Max Control Utilization% - DDP');
+        display((max(uDDP,[],2) - min(uDDP,[],2)) ./ repmat((Op.lims(:,2) - Op.lims(:,1)),num_obj,1) .* 100);
     end
 end
 % animate the resulting trajectory
@@ -87,7 +96,11 @@ for i=1:T
    handles = [];
    set(0,'currentfigure',9);
    for j=0:num_obj-1
-       handles = [handles; car.draw(xN((1:4) + 4*j,i), uN((1:2) + 2*j,i))];
+        if doNewton
+            handles = [handles; car.draw(xN((1:4) + 4*j,i), uN((1:2) + 2*j,i), true)];
+        elseif doDDP
+            handles = [handles; car.draw(xDDP((1:4) + 4*j,i), uDDP((1:2) + 2*j,i), true)];
+        end
    end
    drawnow
    for k=1:num_obj

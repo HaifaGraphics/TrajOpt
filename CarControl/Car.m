@@ -10,8 +10,20 @@ classdef Car < handle
         function obj = Car()
             obj.carObjective = CarObjective;
         end
-        
-        function h = draw(obj,x,u)
+        function overlap_length = bbox_overlap(~,X)
+            num_obj = size(X,1) / 4;
+            centers = [X(1:4:end,:) + cos(X(3:4:end,:))*1.1, X(2:4:end,:) + sin(X(3:4:end,:))*1.1];
+            overlap_length = 0;
+            for i=1:num_obj
+                for j=i+1:num_obj
+                    c1 = centers(i,:);
+                    c2 = centers(j,:);
+                    curr_overlap = max(4.6 - sqrt((c1(1:2:end)-c2(1:2:end)).^2 + (c1(2:2:end)-c2(2:2:end)).^2), 0);
+                    overlap_length = overlap_length + sum(curr_overlap);
+                end
+            end
+        end
+        function h = draw(obj,x,u,draw_bbox)
             
             body        = [0.9 2.1 0.3];           % body = [width length curvature]
             bodycolor   = 0.5*[1 1 1];
@@ -58,6 +70,12 @@ classdef Car < handle
             h(end+1) = patch(ow*[1 1 -1 -1],ol*[-1 1 1 -1],'k');
             
             obj.twist(h,x(1),x(2),x(3))
+            
+            % Get bounding box
+            if draw_bbox
+                center = [x(1) + cos(x(3))*1.1, x(2) + sin(x(3))*1.1];
+                h(end+1) = viscircles(center,2.3,'LineWidth',0.5);
+            end
         end
         function twist(~,handle,x,y,theta)
             % a planar twist: rotate object by theta, then translate by (x,y)

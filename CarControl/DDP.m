@@ -90,7 +90,7 @@ u   = u0;                   % initial control sequence
 % --- initial trajectory
 [x,u,cost]  = forward_pass(x0(:,1),u,[],[],[],1,DYNCST);
 
-for iter = 1:100
+for iter = 1:1000
         costi = [costi ,sum(cost)];
 
     display([int2str(iter) ': ' num2str(sum(cost(:)))]);

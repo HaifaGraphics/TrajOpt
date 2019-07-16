@@ -39,6 +39,8 @@ classdef CarObjective
     %             b = back wheel rolling distance
                 b  = d + f.*cos(w) - sqrt(d^2 - (f.*sin(w)).^2);
                 if ~isreal(b)
+                    f
+                    v
                     error('FOUND IMG b')
                 end
     %             do = change in car angle
@@ -48,12 +50,12 @@ classdef CarObjective
                 y((1:4) + x_offset,:,:) = y((1:4) + x_offset,:,:)+ dy;    % new state
             end
         end
-        function c = cost(~,x, u)
+        function c = cost(~,x, u, xT)
 %             cost function for car-parking problem
 %             sum of 3 terms:
 %             lu: quadratic cost on controls
 %             lf: final cost on distance from target parking configuration
-%             lx: running cost on distance from origin to encourage tight turns
+%             lx: running cost on distance from target parking location to encourage tight turns
             %u = reshape(u,2,[]);
             %x = reshape(x,4, []);
             final = isnan(u(1,:));
@@ -62,7 +64,7 @@ classdef CarObjective
             num_obj = size(x,1) / 4;
             
             %TODO: increase to 10^4
-            cc  = repmat(1e3,1,num_obj);    % control soft-constraint coefficients
+            cc  = repmat(1e4,1,num_obj);    % control soft-constraint coefficients
             cu  = 1e-2*[1 .25];             % control cost coefficients
             
             cf  = [ .1  .1   1  .3];    % final cost coefficients
@@ -89,27 +91,46 @@ classdef CarObjective
             b(abs(u(2:2:end,:))<acc_lim) = 0;
             lacc = cc*b;
             
+            % Collision soft-constraint
+            overlap_length = 0;
+            if num_obj > 1
+                overlap_length = Car().bbox_overlap(x);
+               % if overlap_length ~= 0
+               %     disp('Collision detected');
+               % end
+            end
+            lc = 1e4/(1+exp(-1*overlap_length));
+
 %             final cost
             if any(final)
-                llf      = cf*x(:,final).^2;
+                llf      = cf*(x(:,final)-xT).^2;
                 lf       = double(final);
                 lf(final)= llf;
             else
                 lf    = 0;
             end
 %             running cost
-            lx = cx*x.^2;
+            lx = cx*(x-xT).^2;
             
-            c     = lu + lang + lacc + lx + 100*lf;
+            
+            c     = lu + lang + lacc + lc + lx + 100*lf;
+            if c>1e6
+                lu
+                lang
+                lacc
+                lc
+                lx
+                100*lf
+            end
         end
         
-        function [f,c,fx,fu,fxx,fxu,fuu,cx,cu,cxx,cxu,cuu] = dyn_cst(obj,x,u,fullHessian)
+        function [f,c,fx,fu,fxx,fxu,fuu,cx,cu,cxx,cxu,cuu] = dyn_cst(obj,x,u,xT,fullHessian)
 %             combine car dynamics and cost
 %             use helper function finite_difference() to compute derivatives
             
             if nargout == 2
                 f = obj.dynamics(x,u);
-                c = obj.cost(x,u);
+                c = obj.cost(x,u,xT);
             else
 %                 state and control indices
                 num_obj = size(x,1) / 4;
@@ -137,7 +158,7 @@ classdef CarObjective
                 end
                 
 %                 cost first derivatives
-                xu_cost = @(xu) obj.cost(xu(ix,:),xu(iu,:));
+                xu_cost = @(xu) obj.cost(xu(ix,:),xu(iu,:),xT);
                 J       = squeeze(obj.finite_difference(xu_cost, [x; u]));
                 cx      = J(ix,:);
                 cu      = J(iu,:);
