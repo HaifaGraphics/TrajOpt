@@ -25,6 +25,20 @@ classdef Car < handle
         function y=simulate(obj)
             
         end
+        function [c,cx,cu,cxx,cuu,cxu]=cost(obj)
+            % compute c
+            %if nargout > ..
+                % compute cx,cu....
+        end
+        function [f,fx,fu,fxx,fxu,fuu]=simulation(obj)
+            % same as cost, but for the simulation (called dynamics in the
+            % current implementation)
+        end
+        function drawAtTimestep(t)
+            % draws the car at time step t using draw
+        end
+        function drawTrajectory()
+        end
         function h = draw(obj,x,u,draw_bbox)
             
             body        = [0.9 2.1 0.3];           % body = [width length curvature]
