@@ -1,14 +1,13 @@
 classdef Car < handle
-    %CAR Summary of this class goes here
-    %   Detailed explanation goes here
-    
+%class for drawing and representing the state of a car
+
     properties
-        carObjective
+        x % trajectory
+        u % control
     end
     
     methods
         function obj = Car()
-            obj.carObjective = CarObjective;
         end
         function overlap_length = bbox_overlap(~,X)
             num_obj = size(X,1) / 4;
@@ -22,6 +21,9 @@ classdef Car < handle
                     overlap_length = overlap_length + sum(curr_overlap);
                 end
             end
+        end
+        function y=simulate(obj)
+            
         end
         function h = draw(obj,x,u,draw_bbox)
             

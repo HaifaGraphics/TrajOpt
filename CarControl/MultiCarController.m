@@ -1,16 +1,13 @@
-classdef CarObjective
-%     CAROBJECTIVE Summary of this class goes here
-%       Detailed explanation goes here
-    
+classdef MultiCarController
     properties
-        
+        Cars
     end
     
     methods
-        function obj = CarObjective()
+        function obj = MultiCarController()
         end
         
-        function y = dynamics(~,x,u)
+        function y = simulate(~,x,u)
             
 %             === states and controls:
 %             x = [x1 y1 t1 v1 x2 y2 t2 v2 ...]' = [x; y; car_angle; front_wheel_velocity...]
@@ -194,10 +191,7 @@ classdef CarObjective
             m       = numel(Y)/(K*(n+1));
             Y       = reshape(Y, m, K, n+1);
             J       = pp(Y(:,:,2:end), -Y(:,:,1)) / h;
-            J       = permute(J, [1 3 2]);
-            
+            J       = permute(J, [1 3 2]); 
         end
-    
-
     end
 end
