@@ -1,4 +1,4 @@
-function [x, u, cost,costi] = Newton(DYNCST, x0, u0, Op)
+function [x, u, cost,costi] = Newton(SIMULATE, COST, x0, u0, Op)
     costi=[];
     % --- initial sizes and controls
     n   = size(x0, 1);          % dimension of state vector
@@ -8,14 +8,15 @@ function [x, u, cost,costi] = Newton(DYNCST, x0, u0, Op)
     num_obj = n / 4;
 
     % --- initial trajectory
-    [x,cost]  = forward_pass(x0,u,DYNCST);
+    [x,cost]  = forward_pass(x0,u,SIMULATE,COST);
 
     for iter = 1:100
         costi = [costi ,sum(cost)];
 
         display([int2str(iter) ': ' num2str(sum(cost(:)))]);
         %====== STEP 1: compute Hessian and derivative
-        [~,~,fx,fu,fxx,fxu,fuu,cx,cu,cxx,cxu,cuu] = DYNCST(x, [u nan(m,1)], 1:N+1);
+        [~,fx,fu,fxx,fxu,fuu] = SIMULATE([u nan(m,1)], 1:N+1);
+        [~,cx,cu,cxx,cxu,cuu] = COST([u nan(m,1)], 1:N+1);
         cu = cu(:,1:end-1);
         temp = cellfun(@sparse,  num2cell(fx,[1,2]), 'uni',0);
         fx=blkdiag(temp{1:end-1});
@@ -32,7 +33,7 @@ function [x, u, cost,costi] = Newton(DYNCST, x0, u0, Op)
         eps = 1e-6;
         du = eps*(rand(size(u))-0.5);
         dx1 = reshape(S*du(:),4,[]);
-        [xp,costp]  = forward_pass(x0,u+du,DYNCST);
+        [xp,costp]  = forward_pass(x0,u+du,SIMULATE,COST);
         dx2 = xp-x;
         dc1 = dcdu'*du(:);
         dc2 = sum(costp(:)-cost(:));
@@ -77,10 +78,10 @@ function [x, u, cost,costi] = Newton(DYNCST, x0, u0, Op)
         costnew = zeros(size(cost));
         flag = true;
         while flag
-            [xnew,costnew] = forward_pass(x0 ,u+alpha*p,DYNCST);
+            [xnew,costnew] = forward_pass(x0,u+alpha*p,SIMULATE,COST);
             if sum(cost(:)) < sum(costnew(:))
                 alpha = alpha / 2;
-                display('line search fail');
+                display(['line search fail with new cost ' num2str(sum(costnew(:)))]);
             else
                 flag = false;
             end
@@ -99,17 +100,18 @@ function [x, u, cost,costi] = Newton(DYNCST, x0, u0, Op)
         end
     end
 end
-function [x,cost] = forward_pass(x0,u,DYNCST)
+function [x,cost] = forward_pass(x0,u,SIMULATE,COST)
     n = size(x0,1);
     N = size(u,2);
 
     x = zeros(n,N);
     cost = zeros(1,N+1);
     x(:,1)=x0;
+    
     for i = 1:N
-        [x(:,i+1), cost(:,i)]  = DYNCST(x(:,i), u(:,i));
+        x(:,i+1) = SIMULATE(u(:,i), i);
     end
     final_u(1:size(u,1)) = nan;
-    [~, cost(:,N+1)] = DYNCST(x(:,N+1),final_u');
-
+    cost = COST([u final_u']);
+    assert(size(cost,1) == 1 & size(cost,2) == N+1);
 end

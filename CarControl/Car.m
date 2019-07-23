@@ -1,27 +1,119 @@
 classdef Car < handle
-    %CAR Summary of this class goes here
-    %   Detailed explanation goes here
-    
+%class for drawing and representing the state of a car.
+% The trajectory and control at time i are updated when simulate(u, i) is
+% called.
+
     properties
-        carObjective
+        x % trajectory
+        u % control
+        xT % Target state
     end
     
     methods
-        function obj = Car()
-            obj.carObjective = CarObjective;
+        function obj = Car(x0, u0, xT)
+            obj.x = nan(size(x0,1),size(u0,2));
+            obj.x(:,1) = x0;
+            obj.u = u0;
+            obj.xT = xT;
         end
-        function overlap_length = bbox_overlap(~,X)
-            num_obj = size(X,1) / 4;
-            centers = [X(1:4:end,:) + cos(X(3:4:end,:))*1.1, X(2:4:end,:) + sin(X(3:4:end,:))*1.1];
-            overlap_length = 0;
-            for i=1:num_obj
-                for j=i+1:num_obj
-                    c1 = centers(i,:);
-                    c2 = centers(j,:);
-                    curr_overlap = max(4.6 - sqrt((c1(1:2:end)-c2(1:2:end)).^2 + (c1(2:2:end)-c2(2:2:end)).^2), 0);
-                    overlap_length = overlap_length + sum(curr_overlap);
-                end
+        
+        function c = cost(obj,u)
+%             cost function for car-parking problem
+%             sum of 3 terms:
+%             lu: quadratic cost on controls
+%             lf: final cost on distance from target parking configuration
+%             lx: running cost on distance from target parking location to encourage tight turns
+
+            final = isnan(u(1,:));
+            u(:,final)  = 0;
+            
+            x = obj.x;
+            xT = obj.xT;
+            
+            num_obj = size(x,1) / 4;
+            
+            %TODO: increase to 10^4
+            cc  = repmat(1e4,1,num_obj);    % control soft-constraint coefficients
+            cu  = 1e-2*[1 .25];             % control cost coefficients
+            
+            cf  = [ .1  .1   1  .3];    % final cost coefficients
+            %pf  = [.01 .01 .01  1]';    % smoothness scales for final cost
+            
+            cx  = 1e-3*[1  1 0 0];          % running cost coefficients
+            
+%           pad coefficients for multiple cars
+            cu = repmat(cu,1,num_obj);
+            cf = repmat(cf,1,num_obj);
+            cx = repmat(cx,1,num_obj);
+            
+%           control cost
+            lu    = cu*u.^2;
+            angle_lim = 0.5;
+            %a = (10*(abs(u(1,:))-angle_lim)).^2;
+            a = (abs(u(1:2:end,:))-angle_lim).^2;
+            a(abs(u(1:2:end,:))<angle_lim) = 0;
+            lang = cc*a;
+            
+            acc_lim = 2;
+            %b = (10*(abs(u(2,:))-acc_lim)).^2;
+            b = (abs(u(2:2:end,:))-acc_lim).^2;
+            b(abs(u(2:2:end,:))<acc_lim) = 0;
+            lacc = cc*b;
+
+%             final cost
+            if any(final)
+                llf      = cf*(x(:,final)-xT).^2;
+                lf       = double(final);
+                lf(final)= llf;
+            else
+                lf    = 0;
             end
+%             running cost
+            lx = cx*(x-obj.xT).^2;
+            
+            c     = lu + lang + lacc + lx + 100*lf;
+        end
+        function y=simulate(obj,u,i)
+%             === states and controls:
+%             x = [x1 y1 t1 v1]' = [x; y; car_angle; front_wheel_velocity]
+%             u = [w1 a1]'     = [front_wheel_angle; acceleration]
+
+            x = obj.x(:,i);
+%             constants
+            d  = 2.0;      % d = distance between back and front axles
+            h  = 0.03;     % h = timestep (seconds)
+
+            %             controls
+            w  = u(1:2:end,:,:); % w = front wheel angle
+            a  = u(2:2:end,:,:); % a = front wheel acceleration
+
+
+
+            v  = x(4:4:end,:,:); % v = front wheel velocity
+            f  = h*v;      % f = front wheel rolling distance
+%             b = back wheel rolling distance
+            b  = d + f.*cos(w) - sqrt(d^2 - (f.*sin(w)).^2);
+            if ~isreal(b)
+                f
+                v
+                error('FOUND IMG b')
+            end
+%             do = change in car angle
+            do = asin(sin(w).*f/d);
+            dy = [];
+            for j=1:size(x,1)/4
+                o  = x(3 + 4*(j-1),:,:); % o = car angle
+    %             z = unit_vector(o)
+                z  = [cos(o); sin(o)];
+                dy = [dy; [b(j,:);b(j,:)].*z; do(j,:); h*a(j,:)]; % change in state
+            end          
+            y = x + dy;                         % new state
+            %Update internal trajectory and control
+            obj.x(:,i+1) = y;
+            obj.u(:,i+1) = u;
+        end
+        function h = drawAtTimestep(obj,t)
+            h = obj.draw(obj.x(:,t),obj.u(:,t),true);
         end
         function h = draw(obj,x,u,draw_bbox)
             
@@ -71,7 +163,7 @@ classdef Car < handle
             
             obj.twist(h,x(1),x(2),x(3))
             
-            % Get bounding box
+            % Draw bounding box
             if draw_bbox
                 center = [x(1) + cos(x(3))*1.1, x(2) + sin(x(3))*1.1];
                 h(end+1) = viscircles(center,2.3,'LineWidth',0.5);

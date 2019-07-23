@@ -1,4 +1,4 @@
-function [x, u, L, Vx, Vxx, cost,costi] = DDP(DYNCST, x0, u0, Op)
+function [x, u, L, Vx, Vxx, cost,costi] = DDP(SIMULATE, COST, x0, u0, Op)
 % iLQG - solve the deterministic finite-horizon optimal control problem.
 %
 %        minimize sum_i CST(x(:,i),u(:,i)) + CST(x(:,end))
@@ -88,14 +88,15 @@ N   = size(u0, 2);          % number of state transitions
 u   = u0;                   % initial control sequence
 
 % --- initial trajectory
-[x,u,cost]  = forward_pass(x0(:,1),u,[],[],[],1,DYNCST);
+[x,u,cost]  = forward_pass(x0(:,1),u,[],[],[],1,SIMULATE,COST);
 
-for iter = 1:1000
+for iter = 1:100
         costi = [costi ,sum(cost)];
 
     display([int2str(iter) ': ' num2str(sum(cost(:)))]);
     %====== STEP 1: differentiate dynamics and cost along new trajectory
-    [~,~,fx,fu,fxx,fxu,fuu,cx,cu,cxx,cxu,cuu] = DYNCST(x, [u nan(m,1)], 1:N+1);
+    [~,fx,fu,fxx,fxu,fuu] = SIMULATE([u nan(m,1)], 1:N+1);
+    [~,cx,cu,cxx,cxu,cuu] = COST([u nan(m,1)], 1:N+1);
     
     %====== STEP 2: backward pass, compute optimal control law and cost-to-go
     lambda = 0.0001; % regularization
@@ -107,7 +108,7 @@ for iter = 1:1000
     costnew = zeros(size(cost));
     flag = true;
     while flag
-        [xnew,unew,costnew] = forward_pass(x0 ,u+l*alpha, L, x(:,1:N),[],1,DYNCST);
+        [xnew,unew,costnew] = forward_pass(x0 ,u+l*alpha, L, x(:,1:N),[],1,SIMULATE,COST);
         if sum(cost(:)) < sum(costnew(:))
             alpha = alpha / 2;
 %             display('line search fail');
@@ -131,7 +132,7 @@ for iter = 1:1000
 end
 
 
-function [xnew,unew,cnew] = forward_pass(x0,u,L,x,du,Alpha,DYNCST,lims)
+function [xnew,unew,cnew] = forward_pass(x0,u,L,x,du,Alpha,SIMULATE,COST)
 % parallel forward-pass (rollout)
 % internally time is on the 3rd dimension, 
 % to facillitate vectorized dynamics calls
@@ -158,9 +159,10 @@ for i = 1:N
         unew(:,:,i) = unew(:,:,i) + L(:,:,i)*dx;
     end
 
-    [xnew(:,:,i+1), cnew(:,:,i)]  = DYNCST(xnew(:,:,i), unew(:,:,i), i*K1);
+    xnew(:,:,i+1) = SIMULATE(unew(:,:,i), i*K1);
 end
-[~, cnew(:,:,N+1)] = DYNCST(xnew(:,:,N+1),nan(m,K,1),i);
+cnew = COST(cat(3,unew,nan(m,K,1)));
+assert(size(cnew,1) == 1 & size(cnew,2) == N+1);
 % put the time dimension in the columns
 xnew = permute(xnew, [1 3 2]);
 unew = permute(unew, [1 3 2]);

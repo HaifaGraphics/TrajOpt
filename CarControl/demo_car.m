@@ -6,24 +6,25 @@ fprintf(['\nA demonstration of the iLQG algorithm '...
 'for details see\nTassa, Mansard & Todorov, ICRA 2014\n'...
 '\"Control-Limited Differential Dynamic Programming\"\n'])
 
+% set up the optimization problem
+num_obj = 1;                % number of cars
+T       = 500;              % horizon
+Op.lims  = [-.5 .5;         % wheel angle limits (radians)
+             -2  2];        % acceleration limits (m/s^2)
+x0      = [-4;0;0;0;]%4;0;-pi;0];%;0;-5;5;0;0];   % initial state
+u0      = repmat(Op.lims(:,1),num_obj,T) + repmat(Op.lims(:,2) - Op.lims(:,1),num_obj,T) .* rand(2*num_obj, T); % initial controls
+xT      = [4;0;pi;0;]%-4;0;0;0]; % target state
 
-car = Car;
-carobj = car.carObjective;
+controller = MultiCarController(num_obj, x0, u0, xT); %pass number of cars, target configuration
+
 % Set full_DDP=true to compute 2nd order derivatives of the 
 % dynamics. This will make iterations more expensive, but 
 % final convergence will be much faster (quadratic)
 full_DDP = false;
 
-% set up the optimization problem
-xT      = [-5;-2;pi*3/2;0;5;2;-pi*3/2;0]; % target state
-DYNCST  = @(x,u,i) carobj.dyn_cst(x,u,xT,full_DDP);
-T       = 500;              % horizon
-num_obj = 2;                % number of cars
-x0      = [-4;0;0;0;4;0;-pi;0];%;0;-5;5;0;0];   % initial state
-u0      = repmat([-.5;-2],num_obj,T) + repmat([1;2],num_obj,T) .* rand(2*num_obj, T); % initial controls
-Op.lims  = [-.5 .5;         % wheel angle limits (radians)
-             -2  2];        % acceleration limits (m/s^2)
-doNewton = false;
+SIMULATE  = @(u,i) controller.dynamics(u,i,full_DDP);
+COST      = @(u,i) controller.costWithDerivatives(u);
+doNewton = true;
 doDDP    = true;
 
 % prepare the visualization window and graphics callback
@@ -35,6 +36,7 @@ box on
 
 % plot target configuration with light colors
 handles = [];
+car = Car([0 0 0 0]',nan,nan);
 for i=1:num_obj
     handles = [handles; car.draw(xT((1:4)+4*(i-1)), [0 0]', false)];
 end
@@ -51,13 +53,13 @@ colorstring = 'brgky';
 for i=1:num_obj
     line_handles(i) = line([0 0],[0 0],'color',colorstring(i),'linewidth',2);
 end
-%line_handle = line([0 0],[0 0],'color','b','linewidth',2);
+
 plotFn = @plot_trajectory;
 Op.plotFn = plotFn;
 
 % === run the optimization!
-if doNewton [xN,uN,costN,costNi]= Newton(DYNCST, x0, u0, Op);, end
-if doDDP [xDDP,uDDP,~,~,~,costDDP,costDDPi]= DDP(DYNCST, x0, u0, Op);, end
+if doNewton [xN,uN,costN,costNi]= Newton(SIMULATE, COST, x0, u0, Op);, end
+if doDDP [xDDP,uDDP,~,~,~,costDDP,costDDPi]= DDP(SIMULATE, COST, x0, u0, Op);, end
 % check control sequence legality
 if ~isempty(Op.lims)
     m   = size(u0, 1) / num_obj;
@@ -90,23 +92,9 @@ if ~isempty(Op.lims)
         display((max(uDDP,[],2) - min(uDDP,[],2)) ./ repmat((Op.lims(:,2) - Op.lims(:,1)),num_obj,1) .* 100);
     end
 end
-% animate the resulting trajectory
-figure(9)
-for i=1:T
-   handles = [];
-   set(0,'currentfigure',9);
-   for j=0:num_obj-1
-        if doNewton
-            handles = [handles; car.draw(xN((1:4) + 4*j,i), uN((1:2) + 2*j,i), true)];
-        elseif doDDP
-            handles = [handles; car.draw(xDDP((1:4) + 4*j,i), uDDP((1:2) + 2*j,i), true)];
-        end
-   end
-   drawnow
-   for k=1:num_obj
-    delete(handles(k,:))
-   end
-end
+
+% animate the resulting trajectories
+controller.animateTrajectories();
 
 function plot_trajectory(x)
     num_obj = size(x,1) / 4;
