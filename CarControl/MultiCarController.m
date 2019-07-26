@@ -42,19 +42,20 @@ classdef MultiCarController
         end
         function c = cost(obj, u)
             c = 0;
+            x = nan(size(obj.xT,1),obj.T+1);
             for i=0:length(obj.Cars)-1
                 u_car = u((1:obj.ctrls_per_car) + i*obj.ctrls_per_car,:);
                 xT_car = obj.xT((1:obj.states_per_car) + i*obj.states_per_car);
                 c = c + obj.Cars{i+1}.cost(u_car);
+                x((1:obj.states_per_car) + i*obj.states_per_car,:) = obj.Cars{i+1}.x;
             end
 
             % Collision soft-constraint
-%             overlap_length = 0;
-%             if length(obj.Cars) > 1
-%                 overlap_length = obj.bbox_overlap(x);
-%             end
-%             lc = 1e3*(tanh(overlap_length));
-            lc = 0;
+             overlap_length = 0;
+             if length(obj.Cars) > 1
+                 overlap_length = obj.bbox_overlap(x);
+             end
+             lc = 1e3*overlap_length;
             
             c     = c + lc;
         end
@@ -64,12 +65,11 @@ classdef MultiCarController
             c = obj.hypotheticalCar.cost(u);
 
             % Collision soft-constraint
-%             overlap_length = 0;
-%             if length(obj.Cars) > 1
-%                 overlap_length = obj.bbox_overlap(x);
-%             end
-%             lc = 1e3*(tanh(overlap_length));
-            lc = 0;
+             overlap_length = 0;
+             if length(obj.Cars) > 1
+                 overlap_length = obj.bbox_overlap(x);
+             end
+             lc = 1e3*overlap_length;
             
             c     = c + lc;
         end
@@ -98,7 +98,7 @@ classdef MultiCarController
                     xu_Jcst = @(xu) obj.finite_difference(xu_dyn, xu);
                     JJ      = obj.finite_difference(xu_Jcst, [x; u]);
                     sJ = size(J);
-                    JJ      = reshape(JJ, [4 6 sJ(2:end)]);
+                    JJ      = reshape(JJ, [4*num_obj 6*num_obj sJ(2:end)]);
                     JJ      = 0.5*(JJ + permute(JJ,[1 3 2 4])); %symmetrize
                     fxx     = JJ(:,ix,ix,:);
                     fxu     = JJ(:,ix,iu,:);
@@ -168,8 +168,8 @@ classdef MultiCarController
                 for j=i+1:num_obj
                     c1 = [center_X(i,:); center_Y(i,:)];
                     c2 = [center_X(j,:); center_Y(j,:)];
-                    curr_overlap = max(4.6 - sqrt((c1(1,:)-c2(1,:)).^2 + (c1(2,:)-c2(2,:)).^2), 0);
-                    overlap_length = overlap_length + sum(curr_overlap);
+                    curr_overlap = max(4.6 - sqrt((c1(1,:)-c2(1,:)).^2 + (c1(2,:)-c2(2,:)).^2), 0).^2;
+                    overlap_length = overlap_length + curr_overlap;
                 end
             end
         end

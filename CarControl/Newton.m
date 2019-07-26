@@ -17,6 +17,7 @@ function [x, u, cost,costi] = Newton(SIMULATE, COST, x0, u0, Op)
         %====== STEP 1: compute Hessian and derivative
         [~,fx,fu,fxx,fxu,fuu] = SIMULATE([u nan(m,1)], 1:N+1);
         [~,cx,cu,cxx,cxu,cuu] = COST([u nan(m,1)], 1:N+1);
+        display(['Derivatives: sum(cu):' num2str(sum(abs(cu(:)))) ' sum(cx): ' num2str(sum(abs(cx(:))))]);
         cu = cu(:,1:end-1);
         temp = cellfun(@sparse,  num2cell(fx,[1,2]), 'uni',0);
         fx=blkdiag(temp{1:end-1});
@@ -48,7 +49,7 @@ function [x, u, cost,costi] = Newton(SIMULATE, COST, x0, u0, Op)
         cxu=blkdiag(temp{1:end-1});
         
         H = S'*cxx*S + cuu;
-        H=H+0.0*sparse(eye(size(H)));
+        H=H+1e-4*sparse(eye(size(H)));
 
         %====== STEP 2: Line search
         p = reshape(-H\dcdu,2*num_obj,[]);
@@ -58,9 +59,9 @@ function [x, u, cost,costi] = Newton(SIMULATE, COST, x0, u0, Op)
         end
         %TODO: add constant regularization, eigen decomposition is too slow for
         %complex problems, so add h*I to H
-%         s=eig(H'+H);
-%         if(any(s<0))
-%             disp('H not PSD, trying to modify H');
+%          s=eig(H'+H);
+%          if(any(s<0))
+%              disp('H not PSD, trying to modify H');
 %             flag = true;
 %             mu = 1e-4;
 %             itr = 0;
@@ -74,11 +75,12 @@ function [x, u, cost,costi] = Newton(SIMULATE, COST, x0, u0, Op)
 %             disp(['Modifying H took ' int2str(itr) ' iterations']);
 %         end
         
-        alpha = 1;
+        alpha = .2;
         costnew = zeros(size(cost));
         flag = true;
         while flag
             [xnew,costnew] = forward_pass(x0,u+alpha*p,SIMULATE,COST);
+            Op.plotFn(x, xnew);
             if sum(cost(:)) < sum(costnew(:))
                 alpha = alpha / 2;
                 display(['line search fail with new cost ' num2str(sum(costnew(:)))]);

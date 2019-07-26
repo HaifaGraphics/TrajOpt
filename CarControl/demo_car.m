@@ -7,13 +7,13 @@ fprintf(['\nA demonstration of the iLQG algorithm '...
 '\"Control-Limited Differential Dynamic Programming\"\n'])
 
 % set up the optimization problem
-num_obj = 1;                % number of cars
+num_obj = 2;                % number of cars
 T       = 500;              % horizon
 Op.lims  = [-.5 .5;         % wheel angle limits (radians)
              -2  2];        % acceleration limits (m/s^2)
-x0      = [-4;0;0;0;]%4;0;-pi;0];%;0;-5;5;0;0];   % initial state
+x0      = [-7;3;0;0;-7;-3;0;0];%;0;-5;5;0;0];   % initial state
 u0      = repmat(Op.lims(:,1),num_obj,T) + repmat(Op.lims(:,2) - Op.lims(:,1),num_obj,T) .* rand(2*num_obj, T); % initial controls
-xT      = [4;0;pi;0;]%-4;0;0;0]; % target state
+xT      = [7;-3;0;0;7;3;0;0]; % target state
 
 controller = MultiCarController(num_obj, x0, u0, xT); %pass number of cars, target configuration
 
@@ -48,10 +48,13 @@ set(handles, {'facecolor','edgecolor'}, [fcolor ecolor])
 
 % prepare and install trajectory visualization callback
 global line_handles;
+global hyp_line_handles;
 line_handles = gobjects(num_obj);
+hyp_line_handles = gobjects(num_obj);
 colorstring = 'brgky';
 for i=1:num_obj
     line_handles(i) = line([0 0],[0 0],'color',colorstring(i),'linewidth',2);
+    hyp_line_handles(i) = line([0 0],[0 0],'color',colorstring(i),'LineStyle','--','linewidth',1);
 end
 
 plotFn = @plot_trajectory;
@@ -96,10 +99,15 @@ end
 % animate the resulting trajectories
 controller.animateTrajectories();
 
-function plot_trajectory(x)
+function plot_trajectory(x, xhyp)
     num_obj = size(x,1) / 4;
     global line_handles;
+    global hyp_line_handles;
     for i=1:num_obj
         set(line_handles(i),'Xdata',x(1+(i-1)*4,:),'Ydata',x(2+(i-1)*4,:));
+        if nargin > 1
+            set(hyp_line_handles(i),'Xdata',xhyp(1+(i-1)*4,:),'Ydata',xhyp(2+(i-1)*4,:));
+            pause(0.1);
+        end
     end
 end
