@@ -49,13 +49,28 @@ function [x, u, cost,costi] = Newton(SIMULATE, COST, x0, u0, Op)
         cxu=blkdiag(temp{1:end-1});
         
         H = S'*cxx*S + cuu;
-        H=H+1e-4*sparse(eye(size(H)));
+        H=H+0*sparse(eye(size(H)));
 
         %====== STEP 2: Line search
         p = reshape(-H\dcdu,2*num_obj,[]);
 %         p = reshape(-dcdu,2,[]);
         if(p(:)'*dcdu>0)
             disp('not a search direction');
+             s=eig(H'+H);
+             if(any(s<0))
+                 disp('H not PSD, trying to modify H');
+                flag = true;
+                mu = 1e-4;
+                itr = 0;
+                while flag
+                    H = H + mu*eye(size(H));
+                    s=eig(H'+H);
+                    flag = any(s<0);    
+                    itr = itr + 1;
+                    mu = mu * 2;
+                end
+                disp(['Modifying H took ' int2str(itr) ' iterations']);
+            end
         end
         %TODO: add constant regularization, eigen decomposition is too slow for
         %complex problems, so add h*I to H

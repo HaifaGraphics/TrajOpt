@@ -109,6 +109,7 @@ for iter = 1:100
     flag = true;
     while flag
         [xnew,unew,costnew] = forward_pass(x0 ,u+l*alpha, L, x(:,1:N),[],1,SIMULATE,COST);
+        Op.plotFn(x, xnew);
         if sum(cost(:)) < sum(costnew(:))
             alpha = alpha / 2;
 %             display('line search fail');
