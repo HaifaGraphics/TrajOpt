@@ -11,9 +11,9 @@ num_obj = 2;                % number of cars
 T       = 500;              % horizon
 Op.lims  = [-.5 .5;         % wheel angle limits (radians)
              -2  2];        % acceleration limits (m/s^2)
-x0      = [-7;3;0;0;-7;-3;0;0];%;0;-5;5;0;0];   % initial state
+x0      = [-5;-5;pi/4;0;-5;5;-pi/4;0];%;0;-5;5;0;0];   % initial state
 u0      = repmat(Op.lims(:,1),num_obj,T) + repmat(Op.lims(:,2) - Op.lims(:,1),num_obj,T) .* rand(2*num_obj, T); % initial controls
-xT      = [7;-3;0;0;7;3;0;0]; % target state
+xT      = [5;5;pi/4;0;5;-5;-pi/4;0]; % target state
 
 controller = MultiCarController(num_obj, x0, u0, xT); %pass number of cars, target configuration
 
@@ -25,7 +25,7 @@ full_DDP = false;
 SIMULATE  = @(u,i) controller.dynamics(u,i,full_DDP);
 COST      = @(u,i) controller.costWithDerivatives(u);
 doNewton = true;
-doDDP    = true;
+doDDP    = false;
 
 % prepare the visualization window and graphics callback
 figure(9);

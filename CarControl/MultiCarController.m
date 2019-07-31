@@ -55,8 +55,8 @@ classdef MultiCarController
              if length(obj.Cars) > 1
                  overlap_length = obj.bbox_overlap(x);
              end
-             lc = 1e3*overlap_length;
-            
+             lc = 1e-1*overlap_length;
+            %display(['Overlap Cost: ' num2str(sum(lc(:))) ' Car Cost: ' num2str(sum(c(:)))]);
             c     = c + lc;
         end
         function c = costHypothetical(obj,x,u,xT)
@@ -69,7 +69,7 @@ classdef MultiCarController
              if length(obj.Cars) > 1
                  overlap_length = obj.bbox_overlap(x);
              end
-             lc = 1e3*overlap_length;
+             lc = 1e-1*overlap_length;
             
             c     = c + lc;
         end

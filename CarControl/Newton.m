@@ -10,7 +10,7 @@ function [x, u, cost,costi] = Newton(SIMULATE, COST, x0, u0, Op)
     % --- initial trajectory
     [x,cost]  = forward_pass(x0,u,SIMULATE,COST);
 
-    for iter = 1:100
+    for iter = 1:250
         costi = [costi ,sum(cost)];
 
         display([int2str(iter) ': ' num2str(sum(cost(:)))]);

@@ -104,7 +104,7 @@ for iter = 1:100
     [~, Vx, Vxx, l, L, dV] = back_pass(cx,cu,cxx,cxu,cuu,fx,fu,fxx,fxu,fuu,lambda,regType,u);
     
     %====== STEP 3: line-search to find new control sequence, trajectory, cost
-    alpha = 1;
+    alpha = .2;
     costnew = zeros(size(cost));
     flag = true;
     while flag
