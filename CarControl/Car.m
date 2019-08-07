@@ -7,14 +7,18 @@ classdef Car < handle
         x % trajectory
         u % control
         xT % Target state
+        angleLim;
+        accLim;
     end
     
     methods
-        function obj = Car(x0, u0, xT)
+        function obj = Car(x0, u0, xT, lims)
             obj.x = nan(size(x0,1),size(u0,2));
             obj.x(:,1) = x0;
             obj.u = u0;
             obj.xT = xT;
+            obj.angleLim = lims(1);
+            obj.accLim = lims(2);
         end
         
         function c = cost(obj,u)
@@ -33,7 +37,7 @@ classdef Car < handle
             num_obj = size(x,1) / 4;
             
             %TODO: increase to 10^4
-            cc  = repmat(1e4,1,num_obj);    % control soft-constraint coefficients
+            cc  = repmat(1e1,1,num_obj);    % control soft-constraint coefficients
             cu  = 1e-2*[1 .25];             % control cost coefficients
             
             cf  = [ .1  .1   1  .3];    % final cost coefficients
@@ -48,16 +52,12 @@ classdef Car < handle
             
 %           control cost
             lu    = cu*u.^2;
-            angle_lim = 0.5;
-            %a = (10*(abs(u(1,:))-angle_lim)).^2;
-            a = (abs(u(1:2:end,:))-angle_lim).^2;
-            a(abs(u(1:2:end,:))<angle_lim) = 0;
+            a = (abs(u(1:2:end,:))-obj.angleLim).^2;
+            a(abs(u(1:2:end,:))<obj.angleLim) = 0;
             lang = cc*a;
             
-            acc_lim = 2;
-            %b = (10*(abs(u(2,:))-acc_lim)).^2;
-            b = (abs(u(2:2:end,:))-acc_lim).^2;
-            b(abs(u(2:2:end,:))<acc_lim) = 0;
+            b = (abs(u(2:2:end,:))-obj.accLim).^2;
+            b(abs(u(2:2:end,:))<obj.accLim) = 0;
             lacc = cc*b;
 
 %             final cost
@@ -94,13 +94,17 @@ classdef Car < handle
             f  = h*v;      % f = front wheel rolling distance
 %             b = back wheel rolling distance
             b  = d + f.*cos(w) - sqrt(d^2 - (f.*sin(w)).^2);
-            if ~isreal(b)
-                f
-                v
-                error('FOUND IMG b')
-            end
+            
+            % if f is large enough, we can have complex values for b and d
+            % that break the small-angle approximation used here.
+            b(~isreal(b)) = nan;
 %             do = change in car angle
             do = asin(sin(w).*f/d);
+            do(~isreal(do)) = nan;
+            
+            if any(isnan(do)) | any(isnan(b))
+                disp("Invalid simulation step found, assigning infinite cost");
+            end
             dy = [];
             for j=1:size(x,1)/4
                 o  = x(3 + 4*(j-1),:,:); % o = car angle
@@ -111,7 +115,7 @@ classdef Car < handle
             y = x + dy;                         % new state
             %Update internal trajectory and control
             obj.x(:,i+1) = y;
-            obj.u(:,i+1) = u;
+            obj.u(:,i) = u;
         end
         function h = drawAtTimestep(obj,t)
             h = obj.draw(obj.x(:,t),obj.u(:,t),true);

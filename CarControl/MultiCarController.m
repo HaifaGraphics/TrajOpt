@@ -4,26 +4,29 @@ classdef MultiCarController
     %dynamics()), costs, and to animate trajectories.
     properties
         Cars
-        hypotheticalCar = Car(nan,nan,nan);     %Used by ___Hypothetical functions to perform dynamics and cost calculations on 
+        hypotheticalCar;                        %Used by ___Hypothetical functions to perform dynamics and cost calculations on 
                                                 %trajectories and control sequences that we don't want to save - 
                                                 %currently used to find derivatives of simulate and cost. 
         states_per_car = 4;
         ctrls_per_car = 2;
-        xT;                                         %Save global target state and horizon
+        xT;                                         %Save global target state, horizon, and control limits
         T;
+        lims;
     end
     
     methods
-        function obj = MultiCarController(num_obj, x0, u0, xT)
+        function obj = MultiCarController(num_obj, x0, u0, xT, lims)
             %This constructor initializes a cell array of Car objects
             %with the corresponding x0, u0, and xT
             obj.xT = xT;
+            obj.lims = lims;
             for i=1:num_obj
                 obj.Cars{i, 1} = Car(x0((1:obj.states_per_car) + (i-1)*obj.states_per_car),...
                                     u0((1:obj.ctrls_per_car) + (i-1)*obj.ctrls_per_car, :),...
-                                    xT((1:obj.states_per_car) + (i-1)*obj.states_per_car));
+                                    xT((1:obj.states_per_car) + (i-1)*obj.states_per_car), lims(:,2));
             end
             obj.T = size(u0,2);
+            obj.hypotheticalCar = Car(nan,nan,nan, lims(:,2));
         end
         
         function y = simulate(obj,u,i)
@@ -56,7 +59,17 @@ classdef MultiCarController
                  overlap_length = obj.bbox_overlap(x);
              end
              lc = 1e-1*overlap_length;
-            %display(['Overlap Cost: ' num2str(sum(lc(:))) ' Car Cost: ' num2str(sum(c(:)))]);
+             
+             %In certain cases, we try to find the cost of control
+             %sequences that result in trajectories that break our
+             %simulation approximations. Simply assigning an infinite cost here is
+             %acceptable since this only happens when soft constraints are
+             %violated by a large margin so the cost function is already
+             %designed to guide the optimization away from these control
+             %sequences.
+             c(isnan(c)) = inf;
+             
+            display(['Overlap Cost: ' num2str(sum(lc(:))) ' Car Cost: ' num2str(sum(c(:)))]);
             c     = c + lc;
         end
         function c = costHypothetical(obj,x,u,xT)
@@ -71,6 +84,9 @@ classdef MultiCarController
              end
              lc = 1e-1*overlap_length;
             
+            if any(isnan(c))
+                error("Invalid simulation found in hypothetical step");
+            end
             c     = c + lc;
         end
         function [f,fx,fu,fxx,fxu,fuu] = dynamics(obj,u,i,fullHessian)
@@ -173,11 +189,36 @@ classdef MultiCarController
                 end
             end
         end
+        function legal = check_legality(obj)
+            % check control sequence legality
+            if ~isempty(obj.lims)
+                num_obj = length(obj.Cars);
+                u = [];
+                for j=1:num_obj
+                    u = [u;obj.Cars{j}.u];
+                end
+                
+                m   = size(u, 1) / num_obj;
+                switch numel(obj.lims)
+                    case 0
+                    case 2*m
+                        obj.lims = sort(obj.lims,2);
+                    case 2
+                        obj.lims = ones(m,1)*sort(obj.lims(:))';
+                    case m
+                        obj.lims = obj.lims(:)*[-1 1];
+                    otherwise
+                        error('limits are of the wrong size')
+                end
+
+                lim_min = repmat(obj.lims(:,1),num_obj,obj.T);
+                lim_max = repmat(obj.lims(:,2),num_obj,obj.T);
+                legal = all(u > lim_min & u < lim_max, 'all');
+            end
+        end
         function animateTrajectories(obj)
-            figure(9)
             for t=1:obj.T
                handles = [];
-               set(0,'currentfigure',9);
                for j=1:length(obj.Cars)
                    car = obj.Cars{j};
                    handles = [handles; car.drawAtTimestep(t)];
