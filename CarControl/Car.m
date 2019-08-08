@@ -72,7 +72,7 @@ classdef Car < handle
             lx = cx*(x-obj.xT).^2;
             
             c     = lu + lang + lacc + lx + 100*lf;
-%            display(['Control Cost: ' num2str(sum(lu(:))) ' Limit Costs: ' num2str(sum(lang(:)) + sum(lacc(:))) ' Running Cost: ' num2str(sum(lx(:))) ' Final Cost: ' num2str(sum(100*lf(:)))] );
+            display(['Control Cost: ' num2str(sum(lu(:))) ' Limit Costs: ' num2str(sum(lang(:)) + sum(lacc(:))) ' Running Cost: ' num2str(sum(lx(:))) ' Final Cost: ' num2str(sum(100*lf(:)))] );
         end
         function y=simulate(obj,u,i)
 %             === states and controls:

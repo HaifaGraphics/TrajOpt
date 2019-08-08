@@ -28,7 +28,7 @@ function [x, u, cost,costi] = Newton(SIMULATE, COST, x0, u0, Op)
         temp = cellfun(@sparse,  num2cell(fu,[1,2]), 'uni',0  );
         fu=-blkdiag(temp{1:end-1});
         fu = [zeros(4*num_obj,size(fu,2)); fu];
-        S=-fx\fu;
+        S=full(-fx\fu);
         dcdu = S' * cx(:)  + cu(:);
         % verification
         eps = 1e-6;
