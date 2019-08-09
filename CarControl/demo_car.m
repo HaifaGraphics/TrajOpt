@@ -8,9 +8,9 @@ fprintf(['\nA demonstration of the iLQG algorithm '...
 
 % set up the optimization problem
 num_obj = 2;                % number of cars
-T       = 500;              % horizon
+T       = 250;              % horizon
 Op.lims  = [-.5 .5;         % wheel angle limits (radians) - must be symmetric about 0
-             -2  2];        % acceleration limits (m/s^2)
+             -4.5  4.5];        % acceleration limits (m/s^2)
 x0      = [-5;-5;pi/4;0;-5;5;-pi/4;0];%;0;-5;5;0;0];   % initial state
 u0      = repmat(Op.lims(:,1),num_obj,T) + repmat(Op.lims(:,2) - Op.lims(:,1),num_obj,T) .* rand(2*num_obj, T); % initial controls
 xT      = [5;5;pi/4;0;5;-5;-pi/4;0]; % target state
