@@ -18,16 +18,18 @@ function [x, u, cost,costi] = Newton(SIMULATE, COST, x0, u0, Op)
         [~,fx,fu,fxx,fxu,fuu] = SIMULATE([u nan(m,1)], 1:N+1);
         [~,cx,cu,cxx,cxu,cuu] = COST([u nan(m,1)], 1:N+1);
         display(['Derivatives: sum(cu):' num2str(sum(abs(cu(:)))) ' sum(cx): ' num2str(sum(abs(cx(:))))]);
+        cx = cx(:,2:end);
         cu = cu(:,1:end-1);
+        
         temp = cellfun(@sparse,  num2cell(fx,[1,2]), 'uni',0);
-        fx=blkdiag(temp{1:end-1});
+        fx=blkdiag(temp{2:end-1});
         A = spdiags(ones(size(fx,1)+8*num_obj,1),0,size(fx,1)+4*num_obj,size(fx,1)+4*num_obj);
-        A((4*num_obj+1):end,1:(end-4*num_obj))=A((4*num_obj+1):end,1:(end-4*num_obj))-fx;
+        A((n+1):end,1:(end-n))=A((n+1):end,1:(end-n))-fx;
         fx = A;
         
         temp = cellfun(@sparse,  num2cell(fu,[1,2]), 'uni',0  );
         fu=-blkdiag(temp{1:end-1});
-        fu = [zeros(4*num_obj,size(fu,2)); fu];
+%         fu = [zeros(4*num_obj,size(fu,2)); fu];
         S=full(-fx\fu);
         dcdu = S' * cx(:)  + cu(:);
         % verification
@@ -35,7 +37,7 @@ function [x, u, cost,costi] = Newton(SIMULATE, COST, x0, u0, Op)
         du = eps*(rand(size(u))-0.5);
         dx1 = reshape(S*du(:),4,[]);
         [xp,costp]  = forward_pass(x0,u+du,SIMULATE,COST);
-        dx2 = xp-x;
+        dx2 = xp(:,2:end)-x(:,2:end);
         dc1 = dcdu'*du(:);
         dc2 = sum(costp(:)-cost(:));
         
@@ -43,52 +45,27 @@ function [x, u, cost,costi] = Newton(SIMULATE, COST, x0, u0, Op)
         cuu=blkdiag(temp{1:end-1});
 
         temp = cellfun(@sparse,  num2cell(cxx,[1,2]), 'uni',0  );
-        cxx=blkdiag(temp{1:end});
+        cxx=blkdiag(temp{2:end});
 
         temp = cellfun(@sparse,  num2cell(cxu,[1,2]), 'uni',0  );
-        cxu=blkdiag(temp{1:end-1});
+        cxu=blkdiag(temp{:});
+        cxu=cxu(n+1:end,1:end-m);
         
-        H = S'*cxx*S + cuu;
+        H = S'*cxx*S + S'*cxu + cxu'*S + cuu;
         H=H+0*sparse(eye(size(H)));
 
         %====== STEP 2: Line search
         p = reshape(-H\dcdu,2*num_obj,[]);
 %         p = reshape(-dcdu,2,[]);
         if(p(:)'*dcdu>0)
-            disp('not a search direction');
-             s=eig(H'+H);
-             if(any(s<0))
-                 disp('H not PSD, trying to modify H');
-                flag = true;
-                mu = 1e-4;
-                itr = 0;
-                while flag
-                    H = H + mu*eye(size(H));
-                    s=eig(H'+H);
-                    flag = any(s<0);    
-                    itr = itr + 1;
-                    mu = mu * 2;
-                end
-                disp(['Modifying H took ' int2str(itr) ' iterations']);
+            disp('not a descent direction');
+            s=eig((H'+H)/2);
+            if(any(s<0))
+                disp('H not PSD, trying to modify H');
+                H = H + (-min(s)+1e-4)*eye(size(H));
             end
+            p = reshape(-H\dcdu,2*num_obj,[]);
         end
-        %TODO: add constant regularization, eigen decomposition is too slow for
-        %complex problems, so add h*I to H
-%          s=eig(H'+H);
-%          if(any(s<0))
-%              disp('H not PSD, trying to modify H');
-%             flag = true;
-%             mu = 1e-4;
-%             itr = 0;
-%             while flag
-%                 H = H + mu*eye(size(H));
-%                 s=eig(H'+H);
-%                 flag = any(s<0);    
-%                 itr = itr + 1;
-%                 mu = mu * 2;
-%             end
-%             disp(['Modifying H took ' int2str(itr) ' iterations']);
-%         end
         
         alpha = .2;
         costnew = zeros(size(cost));
