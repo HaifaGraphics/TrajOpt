@@ -69,7 +69,7 @@ classdef MultiCarController
              %sequences.
              c(isnan(c)) = inf;
              
-            display(['Overlap Cost: ' num2str(sum(lc(:))) ' Car Cost: ' num2str(sum(c(:)))]);
+            %display(['Overlap Cost: ' num2str(sum(lc(:))) ' Car Cost: ' num2str(sum(c(:)))]);
             c     = c + lc;
         end
         function c = costHypothetical(obj,x,u,xT)

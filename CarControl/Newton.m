@@ -9,15 +9,16 @@ function [x, u, cost,costi] = Newton(SIMULATE, COST, x0, u0, Op)
 
     % --- initial trajectory
     [x,cost]  = forward_pass(x0,u,SIMULATE,COST);
+    display([int2str(0) ': ' num2str(sum(cost(:)))]);
 
+    
     for iter = 1:150
         costi = [costi ,sum(cost)];
 
-        display([int2str(iter) ': ' num2str(sum(cost(:)))]);
         %====== STEP 1: compute Hessian and derivative
         [~,fx,fu,fxx,fxu,fuu] = SIMULATE([u nan(m,1)], 1:N+1);
         [~,cx,cu,cxx,cxu,cuu] = COST([u nan(m,1)], 1:N+1);
-        display(['Derivatives: sum(cu):' num2str(sum(abs(cu(:)))) ' sum(cx): ' num2str(sum(abs(cx(:))))]);
+        % display(['Derivatives: sum(cu):' num2str(sum(abs(cu(:)))) ' sum(cx): ' num2str(sum(abs(cx(:))))]);
         cx = cx(:,2:end);
         cu = cu(:,1:end-1);
         
@@ -52,7 +53,6 @@ function [x, u, cost,costi] = Newton(SIMULATE, COST, x0, u0, Op)
         cxu=cxu(n+1:end,1:end-m);
         
         H = S'*cxx*S + S'*cxu + cxu'*S + cuu;
-        H=H+0*sparse(eye(size(H)));
 
         %====== STEP 2: Line search
         p = reshape(-H\dcdu,2*num_obj,[]);
@@ -70,12 +70,14 @@ function [x, u, cost,costi] = Newton(SIMULATE, COST, x0, u0, Op)
         alpha = .2;
         costnew = zeros(size(cost));
         flag = true;
+        lineIters = 0;
         while flag
             [xnew,costnew] = forward_pass(x0,u+alpha*p,SIMULATE,COST);
             Op.plotFn(x, xnew);
             if sum(cost(:)) < sum(costnew(:))
                 alpha = alpha / 2;
-                display(['line search fail with new cost ' num2str(sum(costnew(:)))]);
+                %display(['line search fail with new cost ' num2str(sum(costnew(:)))]);
+                lineIters = lineIters + 1;
             else
                 flag = false;
             end
@@ -87,6 +89,7 @@ function [x, u, cost,costi] = Newton(SIMULATE, COST, x0, u0, Op)
         u              = u+alpha*p;
         x              = xnew;
         cost           = costnew;
+        display([int2str(iter) ': ' num2str(sum(cost(:))) ' Line search iters: ' int2str(lineIters)]);
         Op.plotFn(x);
         drawnow;
         if(deltacost<1e-5 & sum(dcdu.^2)<1e-5)

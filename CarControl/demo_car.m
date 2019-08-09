@@ -12,7 +12,7 @@ T       = 250;              % horizon
 Op.lims  = [-.5 .5;         % wheel angle limits (radians) - must be symmetric about 0
              -4.5  4.5];        % acceleration limits (m/s^2)
 x0      = [-5;-5;pi/4;0;-5;5;-pi/4;0];%;0;-5;5;0;0];   % initial state
-u0      = repmat(Op.lims(:,1),num_obj,T) + repmat(Op.lims(:,2) - Op.lims(:,1),num_obj,T) * 0.5; % initial controls
+u0      = repmat(Op.lims(:,1),num_obj,T) + repmat(Op.lims(:,2) - Op.lims(:,1),num_obj,T) * 0.6; % initial controls
 xT      = [5;5;pi/4;0;5;-5;-pi/4;0]; % target state
 
 controllerN = MultiCarController(num_obj, x0, u0, xT, Op.lims);
