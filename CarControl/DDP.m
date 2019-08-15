@@ -1,4 +1,4 @@
-function [x, u, L, Vx, Vxx, cost,costi] = DDP(SIMULATE, COST, x0, u0, Op)
+function [x, u, L, Vx, Vxx, cost,costi] = DDP(SIMULATE, COST, x0, u0, Op, singleStep)
 % iLQG - solve the deterministic finite-horizon optimal control problem.
 %
 %        minimize sum_i CST(x(:,i),u(:,i)) + CST(x(:,end))
@@ -109,7 +109,7 @@ for iter = 1:150
     flag = true;
     while flag
         [xnew,unew,costnew] = forward_pass(x0 ,u+l*alpha, L, x(:,1:N),[],1,SIMULATE,COST);
-        Op.plotFn(x, xnew);
+        Op.plotFn([x; xnew]);
         if sum(cost(:)) < sum(costnew(:))
             alpha = alpha / 2;
 %             display('line search fail');
@@ -127,7 +127,7 @@ for iter = 1:150
     Op.plotFn(x);
     drawnow;
     
-    if(deltacost<1e-5 & sum(dV.^2)<1e-5)
+    if(deltacost<1e-5 & sum(dV.^2)<1e-5 | nargin > 5 & singleStep)
         break;
     end
 end

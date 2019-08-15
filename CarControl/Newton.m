@@ -1,4 +1,4 @@
-function [x, u, cost,costi] = Newton(SIMULATE, COST, x0, u0, Op)
+function [x, u, cost,costi] = Newton(SIMULATE, COST, x0, u0, Op, singleStep)
     costi=[];
     % --- initial sizes and controls
     n   = size(x0, 1);          % dimension of state vector
@@ -73,7 +73,7 @@ function [x, u, cost,costi] = Newton(SIMULATE, COST, x0, u0, Op)
         lineIters = 0;
         while flag
             [xnew,costnew] = forward_pass(x0,u+alpha*p,SIMULATE,COST);
-            Op.plotFn(x, xnew);
+            Op.plotFn([x; xnew]);
             if sum(cost(:)) < sum(costnew(:))
                 alpha = alpha / 2;
                 %display(['line search fail with new cost ' num2str(sum(costnew(:)))]);
@@ -92,7 +92,7 @@ function [x, u, cost,costi] = Newton(SIMULATE, COST, x0, u0, Op)
         display([int2str(iter) ': ' num2str(sum(cost(:))) ' Line search iters: ' int2str(lineIters)]);
         Op.plotFn(x);
         drawnow;
-        if(deltacost<1e-5 & sum(dcdu.^2)<1e-5)
+        if(deltacost<1e-5 & sum(dcdu.^2)<1e-5 | nargin > 5 & singleStep)
             break;
         end
     end

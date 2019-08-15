@@ -7,6 +7,7 @@ fprintf(['\nA demonstration of the iLQG algorithm '...
 '\"Control-Limited Differential Dynamic Programming\"\n'])
 
 % set up the optimization problem
+global num_obj;
 num_obj = 2;                % number of cars
 T       = 250;              % horizon
 Op.lims  = [-.5 .5;         % wheel angle limits (radians) - must be symmetric about 0
@@ -98,8 +99,10 @@ if doDDP
     controllerDDP.animateTrajectories();
 end
 
-function plot_trajectory(x, xhyp)
-    num_obj = size(x,1) / 4;
+function plot_trajectory(xIn)
+    global num_obj;
+    x = xIn(1:num_obj*4,:);
+    xhyp = xIn((num_obj*4+1):end,:);
     global line_handles;
     global hyp_line_handles;
     for i=1:num_obj
