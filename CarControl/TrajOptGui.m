@@ -163,6 +163,7 @@ settingsUpToDate = false;
     function updateSettings(method)
         if strcmp(method,'Newton and DDP')
             Solver.enableNewton(true);
+            Solver.enableDDP(true);
         elseif strcmp(method,'Newton')
             Solver.enableNewton(true);
             Solver.enableDDP(false);
