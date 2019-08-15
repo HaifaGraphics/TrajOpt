@@ -74,10 +74,12 @@ settingsUpToDate = false;
             if ~settingsUpToDate
                 updateSettings(TxtMenuEnergyType.Value)
             end
+            TxtMenuEnergyType.Enable = false;
             Solver.StartInteractive(MainAxes);
         else
             Solver.StopInteractive();
         end
+        TxtMenuEnergyType.Enable = true;
         %We might be exiting because Randomize was selected, manually
         %trigger the missed callback
         if BtnRandomize.Value()
@@ -94,10 +96,12 @@ settingsUpToDate = false;
             if ~settingsUpToDate
                 updateSettings(TxtMenuEnergyType.Value)
             end
+            TxtMenuEnergyType.Enable = false;
             Solver.StartInteractive(MainAxes, true);  
         else
             Solver.StopInteractive();
         end
+        TxtMenuEnergyType.Enable = true;
         %We might be exiting because Initialize was selected, manually
         %trigger the missed callback
         if BtnInitialize.Value()
