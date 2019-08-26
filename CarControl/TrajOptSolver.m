@@ -31,6 +31,7 @@ classdef TrajOptSolver < matlab.mixin.Copyable
         
         line_handles; %l_h(1,:) returns trajectory lines for every car for Newton, l_h(2,:) does the same for DDP (e.g l_h(2,1) for DDP Car 1).
         hyp_line_handles;
+        targetCar_handles;
         plotFn = @plot_trajectory;
         Op;
         
@@ -44,14 +45,14 @@ classdef TrajOptSolver < matlab.mixin.Copyable
         function obj=NewtonSolver
 
         end
-        function Initialize(obj,MainAxes)
+        function Initialize(obj,x0,xT,MainAxes)
             obj.num_obj = 2;                                % number of cars
             obj.T       = 250;                              % horizon
             obj.lims  = [-.5 .5;                            % wheel angle limits (radians) - must be symmetric about 0
                          -4.5  4.5];                        % acceleration limits (m/s^2)
-            obj.x0      = [-5;-5;pi/4;0;-5;5;-pi/4;0];      % initial state
+            obj.x0      = reshape(x0',[],1);      % initial state
             obj.u0      = repmat(obj.lims(:,1),obj.num_obj,obj.T) + repmat(obj.lims(:,2) - obj.lims(:,1),obj.num_obj,obj.T) * 0.6; % initial controls
-            obj.xT      = [5;5;pi/4;0;5;-5;-pi/4;0];        % target state
+            obj.xT      = reshape(xT',[],1);        % target state
             
             obj.controllerN = MultiCarController(obj.num_obj, obj.x0, obj.u0, obj.xT, obj.lims);
             obj.controllerDDP = MultiCarController(obj.num_obj, obj.x0, obj.u0, obj.xT, obj.lims);
@@ -63,6 +64,8 @@ classdef TrajOptSolver < matlab.mixin.Copyable
             
             delete(obj.line_handles);
             delete(obj.hyp_line_handles);
+            delete(obj.targetCar_handles);
+            obj.targetCar_handles = [];
             line_handles = gobjects(2, obj.num_obj);
             hyp_line_handles = gobjects(2, obj.num_obj);
             
@@ -85,6 +88,7 @@ classdef TrajOptSolver < matlab.mixin.Copyable
                     obj.line_handles(i,k) = line([0 0],[0 0],'color',colorstring(k),'linewidth',2);
                     obj.hyp_line_handles(i,k) = line([0 0],[0 0],'color',colorstring(k),'LineStyle','--','linewidth',1);
                 end
+                obj.targetCar_handles = [obj.targetCar_handles; handles];
             end
         
             obj.Op.lims = obj.lims;
@@ -96,10 +100,10 @@ classdef TrajOptSolver < matlab.mixin.Copyable
             obj.u0      = repmat(obj.Op.lims(:,1),obj.num_obj,obj.T) + repmat(obj.Op.lims(:,2) - obj.Op.lims(:,1),obj.num_obj,obj.T) .* rand(2*obj.num_obj, obj.T); % initial controls
         end
             
-        function StartInteractive(obj, MainAxes, isRand)
+        function StartInteractive(obj,x0,xT,MainAxes,isRand)
             % initialize
-            obj.Initialize(MainAxes);
-            if nargin > 2 & isRand
+            obj.Initialize(x0,xT,MainAxes);
+            if nargin > 4 & isRand
                 obj.Randomize()
             else
                 isRand = false;

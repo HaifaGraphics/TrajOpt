@@ -40,12 +40,54 @@ BtnInitialize.ValueChangedFcn = @OnInitialize;
 BtnRandomize = gui.togglebutton('Randomize');
 BtnRandomize.ValueChangedFcn = @OnRandomize;
 
-TxtMenuEnergyType = gui.textmenu('Method',{'Newton and DDP','Newton','DDP'});
-TxtMenuEnergyType.Value='Newton and DDP';
-TxtMenuEnergyType.ValueChangedFcn = @OnUpdateParams;
+MethodDropDown = gui.textmenu('Method',{'Newton and DDP','Newton','DDP'});
+MethodDropDown.Value='Newton and DDP';
+MethodDropDown.ValueChangedFcn = @OnUpdateParams;
 
-sliderTimeStep = gui.intslider('Time step', [0 40]);
-sliderTimeStep.ValueChangedFcn = @onSliderEigenNum;
+%Preset configurations - These are used to populate the dropdown of presets
+configKeySet = {'Diagonals','Exchange Positions', 'Exchange Positions with Initial Speed', '180° Park in Place', 'Weave', '90° Park'};
+x0Arr = {[-5 -5 pi/4 0;-5  5 -pi/4 0],...
+         [-5  0   0  0; 5  0  pi   0],...
+         [-5  0   0  1; 5  0  pi   1],...
+         [-3.5  0   0  0; 3.5  0  pi   0],...
+         [-3  -6   pi/2  0; 3  -6  pi/2   0],...
+         [-5  0   0  0; 5  0  pi   0]};
+xTArr = {[ 5  5 pi/4 0; 5 -5 -pi/4 0],...
+         [ 5  0   0  0; -5 0  pi   0],...
+         [ 5  0   0  0; -5 0  pi   0],...
+         [-3.5  0   pi  0; 3.5  0  0   0],...
+         [3  6   pi/2  0; -3  6  pi/2   0],...
+         [3  -6   3*pi/2  0; -3  -6  3*pi/2   0]};
+     
+keyTox0 = containers.Map(configKeySet,x0Arr)            %Maps dropdown value to config
+keyToxT = containers.Map(configKeySet,xTArr)
+x0 = keyTox0('Diagonals');
+xT = keyToxT('Diagonals');
+
+tableFig = figure();
+tableFig.Position(3:4) = [400;200];
+tableFig.Position(1:2) = [80;400];
+colInitialNames = {'Initial X'; 'Initial Y'; 'Initial Angle'; 'Initial Speed'};
+colTargetNames = {'Target X'; 'Target Y'; 'Target Angle'; 'Target Speed'};
+rowNames = {'Car 1', 'Car 2'};
+
+InitUITable = uitable(tableFig,'Data', x0, 'ColumnName', colInitialNames, 'ColumnFormat', {'numeric' 'numeric' 'numeric' 'numeric'}, 'RowName', rowNames);
+InitUITable.ColumnEditable = true;
+InitUITable.Position(2) = 100;
+InitUITable.Position(3:4) = InitUITable.Extent(3:4);
+TgtUITable = uitable(tableFig,'Data', xT, 'ColumnName', colTargetNames, 'ColumnFormat', {'numeric' 'numeric' 'numeric' 'numeric'}, 'RowName', rowNames);
+TgtUITable.ColumnEditable = true;
+TgtUITable.Position(2) = 5;
+TgtUITable.Position(3:4) = TgtUITable.Extent(3:4);
+
+InitUITable.CellEditCallback = @tableCellEdit;
+TgtUITable.CellEditCallback = @tableCellEdit;
+
+presets = configKeySet;
+presets{end+1} = 'Custom';              %'Custom' is automatically chosen whenever the configuration tables are edited
+PresetConfigsDropDown = gui.textmenu('Preset Configurations',presets);
+PresetConfigsDropDown.Value = 'Diagonals';
+PresetConfigsDropDown.ValueChangedFcn = @OnUpdateParams;
 
 LabelParams = gui.label('');
 Label1Status = gui.label('');
@@ -53,8 +95,8 @@ Label2Status = gui.label('');
 Label1Status.Position.width = 400;
 Label2Status.Position.width = 400;
 
-BtnLoadSource = gui.pushbutton('Check something');
-BtnLoadSource.ValueChangedFcn = @OnButtonCheckSomething;
+%BtnLoadSource = gui.pushbutton('Check something');
+%BtnLoadSource.ValueChangedFcn = @OnButtonCheckSomething;
 
 %Since the solver contains a loop, it needs to be able to be able to check
 %and exit appropriately when the toggle buttons change since the callbacks
@@ -72,14 +114,20 @@ settingsUpToDate = false;
                 Solver.StopInteractive();
             end
             if ~settingsUpToDate
-                updateSettings(TxtMenuEnergyType.Value)
+                updateSettings(MethodDropDown.Value)
             end
-            TxtMenuEnergyType.Enable = false;
-            Solver.StartInteractive(MainAxes);
+            MethodDropDown.Enable = false;
+            PresetConfigsDropDown.Enable = false;
+            InitUITable.Enable = 'off';
+            TgtUITable.Enable = 'off';
+            Solver.StartInteractive(x0,xT,MainAxes);
         else
             Solver.StopInteractive();
         end
-        TxtMenuEnergyType.Enable = true;
+        MethodDropDown.Enable = true;
+        PresetConfigsDropDown.Enable = true;
+        InitUITable.Enable = 'on';
+        TgtUITable.Enable = 'on';
         %We might be exiting because Randomize was selected, manually
         %trigger the missed callback
         if BtnRandomize.Value()
@@ -94,14 +142,20 @@ settingsUpToDate = false;
                 Solver.StopInteractive();
             end
             if ~settingsUpToDate
-                updateSettings(TxtMenuEnergyType.Value)
+                updateSettings(MethodDropDown.Value)
             end
-            TxtMenuEnergyType.Enable = false;
-            Solver.StartInteractive(MainAxes, true);  
+            MethodDropDown.Enable = false;
+            PresetConfigsDropDown.Enable = false;
+            InitUITable.Enable = 'off';
+            TgtUITable.Enable = 'off';
+            Solver.StartInteractive(x0,xT,MainAxes, true);  
         else
             Solver.StopInteractive();
         end
-        TxtMenuEnergyType.Enable = true;
+        MethodDropDown.Enable = true;
+        PresetConfigsDropDown.Enable = true;
+        InitUITable.Enable = 'on';
+        TgtUITable.Enable = 'on';
         %We might be exiting because Initialize was selected, manually
         %trigger the missed callback
         if BtnInitialize.Value()
@@ -110,6 +164,14 @@ settingsUpToDate = false;
     end
     function OnUpdateParams(~)
         settingsUpToDate = false;
+        if isKey(keyTox0, PresetConfigsDropDown.Value)      %The preset may have changed; update our initial and target configs
+            x0 = keyTox0(PresetConfigsDropDown.Value);
+            xT = keyToxT(PresetConfigsDropDown.Value);
+            InitUITable.Data = x0;
+            TgtUITable.Data = xT;
+        elseif ~strcmp(PresetConfigsDropDown.Value,'Custom')        %if not a defined preset, the dropdown value must be 'Custom'
+            error('Undefined Value in Preset Configuration Drop-down');
+        end    
     end
 
     function OnLeftAxesDown(src,evtdata)
@@ -139,7 +201,7 @@ settingsUpToDate = false;
         end
         OnUpdateParams;
     end
-    function OnSolverIter(src,evtdata)
+    function OnSolverIter(src,evtdata)                              %Update costs at every iteration
         Label1Status.Value = {['Iter: ',num2str(Solver.getIter())]};
         Label1Status.Position.width = 400;  %This shouldn't be necessary
         label2 = {};
@@ -160,6 +222,18 @@ settingsUpToDate = false;
         Label2Status.Position.width = 400;  %This shouldn't be necessary
         Redraw;
     end
+    function tableCellEdit(hObject,callbackData)        %Callback for editing a cell in the initial or target config tables
+        numval = eval(callbackData.EditData);
+        r = callbackData.Indices(1);
+        c = callbackData.Indices(2);
+        hObject.Data(r,c) = numval; 
+        if InitUITable == hObject
+            x0(r,c) = numval;
+        elseif TgtUITable == hObject
+            xT(r,c) = numval;
+        end
+        PresetConfigsDropDown.Value = 'Custom';
+    end
     function OnButtonCheckSomething(src,evtdata)
         Redraw;
     end
@@ -174,7 +248,7 @@ settingsUpToDate = false;
         elseif strcmp(method,'DDP')
             Solver.enableNewton(false);
             Solver.enableDDP(true);
-        end    
+        end
     end
          
 %% Drawing functions
