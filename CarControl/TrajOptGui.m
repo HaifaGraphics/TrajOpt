@@ -121,6 +121,7 @@ settingsUpToDate = false;
             InitUITable.Enable = 'off';
             TgtUITable.Enable = 'off';
             Solver.StartInteractive(x0,xT,MainAxes);
+            BtnInitialize.Value = false;
         else
             Solver.StopInteractive();
         end
@@ -148,7 +149,8 @@ settingsUpToDate = false;
             PresetConfigsDropDown.Enable = false;
             InitUITable.Enable = 'off';
             TgtUITable.Enable = 'off';
-            Solver.StartInteractive(x0,xT,MainAxes, true);  
+            Solver.StartInteractive(x0,xT,MainAxes, true);
+            BtnRandomize.Value = false;
         else
             Solver.StopInteractive();
         end
