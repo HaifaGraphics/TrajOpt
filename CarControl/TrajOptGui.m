@@ -34,11 +34,17 @@ hLis=addlistener(Solver,'IterationDone',@OnSolverIter);
 
 active=false;
 %% GUI initialization
-BtnInitialize = gui.togglebutton('Initialize');
+BtnReset = gui.pushbutton('Reset');
+BtnReset.ValueChangedFcn = @OnReset;
+
+BtnInitialize = gui.togglebutton('Optimize - Preset Controls');
 BtnInitialize.ValueChangedFcn = @OnInitialize;
 
-BtnRandomize = gui.togglebutton('Randomize');
+BtnRandomize = gui.togglebutton('Optimize - Random Controls');
 BtnRandomize.ValueChangedFcn = @OnRandomize;
+
+BtnAnimateTraj = gui.pushbutton('Check and Animate Trajectories');
+BtnAnimateTraj.ValueChangedFcn = @OnAnimateTraj;
 
 MethodDropDown = gui.textmenu('Method',{'Newton and DDP','Newton','DDP'});
 MethodDropDown.Value='Newton and DDP';
@@ -106,29 +112,29 @@ Solver.setButtons(BtnInitialize, BtnRandomize);
 settingsUpToDate = false;
 
 %% Callbacks
+    function OnReset(hObject)
+        Solver.Initialize(x0,xT,MainAxes,false);
+    end
     function OnInitialize(hObject)
         if hObject.Value()
             %Only one of Initialize and Randomize may be selected
             if BtnRandomize.Value()
                 BtnRandomize.Value = 0;
                 Solver.StopInteractive();
+                Solver.Initialize(x0,xT,MainAxes,false);
+            elseif Solver.getIter() == 0 || Solver.isRandom()   %reinitialize if switching random<->preset controls
+                Solver.Initialize(x0,xT,MainAxes,false);
             end
             if ~settingsUpToDate
                 updateSettings(MethodDropDown.Value)
             end
-            MethodDropDown.Enable = false;
-            PresetConfigsDropDown.Enable = false;
-            InitUITable.Enable = 'off';
-            TgtUITable.Enable = 'off';
-            Solver.StartInteractive(x0,xT,MainAxes);
+            setBtnsDuringOpt(false);
+            Solver.StartInteractive(MainAxes);
             BtnInitialize.Value = false;
         else
             Solver.StopInteractive();
         end
-        MethodDropDown.Enable = true;
-        PresetConfigsDropDown.Enable = true;
-        InitUITable.Enable = 'on';
-        TgtUITable.Enable = 'on';
+        setBtnsDuringOpt(true);
         %We might be exiting because Randomize was selected, manually
         %trigger the missed callback
         if BtnRandomize.Value()
@@ -141,28 +147,28 @@ settingsUpToDate = false;
             if BtnInitialize.Value()
                 BtnInitialize.Value = 0;
                 Solver.StopInteractive();
+                Solver.Initialize(x0,xT,MainAxes,true);
+            elseif Solver.getIter() == 0 || ~Solver.isRandom()
+                Solver.Initialize(x0,xT,MainAxes,true);
             end
             if ~settingsUpToDate
                 updateSettings(MethodDropDown.Value)
             end
-            MethodDropDown.Enable = false;
-            PresetConfigsDropDown.Enable = false;
-            InitUITable.Enable = 'off';
-            TgtUITable.Enable = 'off';
-            Solver.StartInteractive(x0,xT,MainAxes, true);
+            setBtnsDuringOpt(false);
+            Solver.StartInteractive(MainAxes);
             BtnRandomize.Value = false;
         else
             Solver.StopInteractive();
         end
-        MethodDropDown.Enable = true;
-        PresetConfigsDropDown.Enable = true;
-        InitUITable.Enable = 'on';
-        TgtUITable.Enable = 'on';
+        setBtnsDuringOpt(true);
         %We might be exiting because Initialize was selected, manually
         %trigger the missed callback
         if BtnInitialize.Value()
             OnInitialize(BtnInitialize);
         end
+    end
+    function OnAnimateTraj(hObject)
+        Solver.checkAndAnimate(MainAxes);
     end
     function OnUpdateParams(~)
         settingsUpToDate = false;
@@ -238,6 +244,20 @@ settingsUpToDate = false;
     end
     function OnButtonCheckSomething(src,evtdata)
         Redraw;
+    end
+%%Callback helpers
+    function setBtnsDuringOpt(enable)
+        BtnReset.Enable = enable;
+        BtnAnimateTraj.Enable = enable;
+        MethodDropDown.Enable = enable;
+        PresetConfigsDropDown.Enable = enable;
+        if enable
+            InitUITable.Enable = 'on';
+            TgtUITable.Enable = 'on';
+        else
+            InitUITable.Enable = 'off';
+            TgtUITable.Enable = 'off';
+        end
     end
 %% Update solver settings
     function updateSettings(method)
